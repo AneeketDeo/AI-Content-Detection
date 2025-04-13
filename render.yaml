@@ -1,0 +1,10 @@
+name: ai-content-detector
+services:
+  - type: web
+    name: streamlit
+    env: python
+    buildCommand: pip install -r requirements-deploy.txt
+    startCommand: streamlit run streamlit_app.py --server.port $PORT --server.address 0.0.0.0
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "true"
