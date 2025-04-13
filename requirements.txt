@@ -9,3 +9,4 @@ opencv-python-headless
 huggingface_hub
 setuptools
 nltk
+torchvision
