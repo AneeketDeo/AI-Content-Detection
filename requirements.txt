@@ -7,3 +7,4 @@ torch==2.0.0
 transformers==4.28.1
 opencv-python-headless==4.7.0
 huggingface_hub==0.14.1
+setuptools
