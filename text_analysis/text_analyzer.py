@@ -59,7 +59,7 @@ class TextAnalysisModule:
         if use_perplexity:
             logger.info(f"Initializing perplexity analyzer with model: {perplexity_model}")
             try:
-                self.analyzers['perplexity'] = PerplexityAnalyzer(model_name=perplexity_model, use_auth_token=token)
+                self.analyzers['perplexity'] = PerplexityAnalyzer(model_name=perplexity_model, token=token)
             except Exception as e:
                 logger.warning(f"Failed to initialize perplexity analyzer: {e}")
                 self.analyzers['perplexity'] = None
