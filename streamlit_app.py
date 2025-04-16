@@ -4,6 +4,11 @@ import sys
 import tempfile
 from PIL import Image
 import time
+import torch
+
+# Prevent Streamlit from trying to introspect torch.classes
+if hasattr(torch.classes, '__path__'):
+    delattr(torch.classes, '__path__')
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
