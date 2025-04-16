@@ -23,6 +23,10 @@ from .transformer_classifier import TransformerClassifier
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+import streamlit as st
+
+token = st.secrets["HF_TOKEN"]
+
 
 class TextAnalysisModule:
     """
@@ -55,7 +59,7 @@ class TextAnalysisModule:
         if use_perplexity:
             logger.info(f"Initializing perplexity analyzer with model: {perplexity_model}")
             try:
-                self.analyzers['perplexity'] = PerplexityAnalyzer(model_name=perplexity_model)
+                self.analyzers['perplexity'] = PerplexityAnalyzer(model_name=perplexity_model, use_auth_token=token)
             except Exception as e:
                 logger.warning(f"Failed to initialize perplexity analyzer: {e}")
                 self.analyzers['perplexity'] = None
@@ -63,7 +67,7 @@ class TextAnalysisModule:
         if use_transformer:
             logger.info(f"Initializing transformer classifier with model: {transformer_model}")
             try:
-                self.analyzers['transformer'] = TransformerClassifier(model_name=transformer_model)
+                self.analyzers['transformer'] = TransformerClassifier(model_name=transformer_model, use_auth_token=token)
             except Exception as e:
                 logger.warning(f"Failed to initialize transformer classifier: {e}")
                 self.analyzers['transformer'] = None
