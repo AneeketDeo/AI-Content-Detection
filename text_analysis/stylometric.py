@@ -17,11 +17,15 @@ from nltk.corpus import stopwords
 # Download required NLTK resources
 try:
     nltk.data.find('tokenizers/punkt')
+    nltk.download('punkt')
+
 except LookupError:
     nltk.download('punkt')
 
 try:
     nltk.data.find('corpora/stopwords')
+    nltk.download('corpora/stopwords')
+
 except LookupError:
     nltk.download('stopwords')
 
