@@ -15,6 +15,7 @@ from typing import Dict, List, Any, Optional, Union
 import logging
 import os
 import torch
+import gc
 
 # Import individual analyzers
 from .stylometric import StylometricAnalyzer
@@ -33,6 +34,9 @@ os.makedirs('models', exist_ok=True)
 # Set environment variable to use local cache
 os.environ['TRANSFORMERS_CACHE'] = os.path.join(os.getcwd(), 'models')
 os.environ['HF_HOME'] = os.path.join(os.getcwd(), 'models')
+
+# Disable PyTorch's custom class registration
+torch._C._disable_custom_class_registration()
 
 token = st.secrets["HF_TOKEN"]
 
@@ -59,32 +63,39 @@ class TextAnalysisModule:
             transformer_model: Model name for transformer classifier
         """
         self.analyzers = {}
+        self.use_stylometric = use_stylometric
+        self.use_perplexity = use_perplexity
+        self.use_transformer = use_transformer
+        self.perplexity_model = perplexity_model
+        self.transformer_model = transformer_model
         
-        # Initialize selected analyzers
+        # Initialize stylometric analyzer immediately as it doesn't use PyTorch
         if use_stylometric:
             logger.info("Initializing stylometric analyzer")
             self.analyzers['stylometric'] = StylometricAnalyzer()
-        
-        if use_perplexity:
-            logger.info(f"Initializing perplexity analyzer with model: {perplexity_model}")
+    
+    def _initialize_perplexity_analyzer(self):
+        """Initialize the perplexity analyzer on demand."""
+        if self.use_perplexity and 'perplexity' not in self.analyzers:
+            logger.info(f"Initializing perplexity analyzer with model: {self.perplexity_model}")
             try:
-                # Use local cache for model loading
-                model_path = os.path.join('models', perplexity_model)
+                model_path = os.path.join('models', self.perplexity_model)
                 if not os.path.exists(model_path):
                     os.makedirs(model_path, exist_ok=True)
-                self.analyzers['perplexity'] = PerplexityAnalyzer(model_name=perplexity_model)
+                self.analyzers['perplexity'] = PerplexityAnalyzer(model_name=self.perplexity_model)
             except Exception as e:
                 logger.warning(f"Failed to initialize perplexity analyzer: {e}")
                 self.analyzers['perplexity'] = None
-        
-        if use_transformer:
-            logger.info(f"Initializing transformer classifier with model: {transformer_model}")
+    
+    def _initialize_transformer_classifier(self):
+        """Initialize the transformer classifier on demand."""
+        if self.use_transformer and 'transformer' not in self.analyzers:
+            logger.info(f"Initializing transformer classifier with model: {self.transformer_model}")
             try:
-                # Use local cache for model loading
-                model_path = os.path.join('models', transformer_model)
+                model_path = os.path.join('models', self.transformer_model)
                 if not os.path.exists(model_path):
                     os.makedirs(model_path, exist_ok=True)
-                self.analyzers['transformer'] = TransformerClassifier(model_name=transformer_model)
+                self.analyzers['transformer'] = TransformerClassifier(model_name=self.transformer_model)
             except Exception as e:
                 logger.warning(f"Failed to initialize transformer classifier: {e}")
                 self.analyzers['transformer'] = None
@@ -106,14 +117,49 @@ class TextAnalysisModule:
         
         # Run each analyzer and collect results
         results = {}
-        for name, analyzer in self.analyzers.items():
-            if analyzer is not None:
-                try:
-                    logger.info(f"Running {name} analysis")
-                    results[name] = analyzer.analyze(text)
-                except Exception as e:
-                    logger.error(f"Error in {name} analysis: {e}")
-                    results[name] = {"error": str(e)}
+        
+        # Run stylometric analysis if available
+        if 'stylometric' in self.analyzers:
+            try:
+                logger.info("Running stylometric analysis")
+                results['stylometric'] = self.analyzers['stylometric'].analyze(text)
+            except Exception as e:
+                logger.error(f"Error in stylometric analysis: {e}")
+                results['stylometric'] = {"error": str(e)}
+        
+        # Initialize and run perplexity analysis
+        if self.use_perplexity:
+            try:
+                self._initialize_perplexity_analyzer()
+                if 'perplexity' in self.analyzers and self.analyzers['perplexity'] is not None:
+                    logger.info("Running perplexity analysis")
+                    results['perplexity'] = self.analyzers['perplexity'].analyze(text)
+            except Exception as e:
+                logger.error(f"Error in perplexity analysis: {e}")
+                results['perplexity'] = {"error": str(e)}
+            finally:
+                # Clean up perplexity analyzer
+                if 'perplexity' in self.analyzers:
+                    del self.analyzers['perplexity']
+                gc.collect()
+                torch.cuda.empty_cache()
+        
+        # Initialize and run transformer analysis
+        if self.use_transformer:
+            try:
+                self._initialize_transformer_classifier()
+                if 'transformer' in self.analyzers and self.analyzers['transformer'] is not None:
+                    logger.info("Running transformer analysis")
+                    results['transformer'] = self.analyzers['transformer'].analyze(text)
+            except Exception as e:
+                logger.error(f"Error in transformer analysis: {e}")
+                results['transformer'] = {"error": str(e)}
+            finally:
+                # Clean up transformer classifier
+                if 'transformer' in self.analyzers:
+                    del self.analyzers['transformer']
+                gc.collect()
+                torch.cuda.empty_cache()
         
         # Combine results and make final determination
         combined_result = self._combine_results(results)
